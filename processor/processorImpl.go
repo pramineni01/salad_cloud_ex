@@ -3,32 +3,28 @@ package processor
 import (
 	"context"
 	"fmt"
-	"log"
+	"io"
+	"net"
+	"time"
+
+	log "github.com/golang/glog"
 )
 
 func (p *processor) Process(ctx context.Context) {
 	// while infinite
 	for true {
-
-			c, err := p.connect(ctx)
-			if err != nil {
-				log.Fatal("TCP connection error: ", err)
-			}
-
-			defer c.Close()
-			msg, err := p.listen(ctx, c)
-			if err != nil {
-			processMessage(msg)
+		c, err := p.connect(ctx)
+		if err != nil {
+			log.Fatal("TCP connection error: ", err)
 		}
+
+		defer c.Close()
+		p.listenAndProcess(ctx, c)
 	}
 }
 
-func (p *processor) connect(ctx contex.Context) (*TCPConn, error) {
+func (p *processor) connect(ctx context.Context) (*net.TCPConn, error) {
 	// use source and port from p and connect tcp
-	if (ctx.Done()) {
-		return errors.New("User interrupt")
-	}
-	
 	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", p.source, p.port))
 	if err != nil {
 		fmt.Printf("Unable to resolve IP")
@@ -43,7 +39,7 @@ func (p *processor) connect(ctx contex.Context) (*TCPConn, error) {
 
 	err = tcpConn.SetKeepAlive(true)
 	if err != nil {
-		log.Warn("Unable to set keepalive - %s", err)	
+		log.Warningf("Unable to set keepalive - %s", err)
 		tcpConn.Close()
 		return nil, err
 	}
@@ -52,16 +48,11 @@ func (p *processor) connect(ctx contex.Context) (*TCPConn, error) {
 	return tcpConn, nil
 }
 
-func (p *processor) listen(ctx contex.Context, c *TCPConn) ([]byte, err){
+func (p *processor) listenAndProcess(ctx context.Context, c *net.TCPConn) {
 	// listen on the connection indefinitely and return on message
-	status, err := bufio.NewReader(c).ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
-
 	for true {
 		select{
-		case ctx.Done:
+		case <-ctx.Done():
 			break
 		default:
 			buf, err := io.ReadAll(c)
@@ -75,16 +66,10 @@ func (p *processor) listen(ctx contex.Context, c *TCPConn) ([]byte, err){
 			} else {
 				processMessage(ctx, buf)
 			}
-			
 		}
 	}
 }
 
-func readToBuffer() ([]byte, err) {
-	io.ReadAll()
-	return nil, err
-}
-
 func processMessage(ctx context.Context, msg []byte) {
-	// process message
+	// process message - not implemented yet
 }
