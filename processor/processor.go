@@ -1,11 +1,12 @@
 package processor
 
 import (
+	"context"
 	"errors"
 )
 
 type Processor interface {
-	Process()
+	Process(context.Context)
 }
 
 func NewProcessor(source string, port uint) (Processor, error) {
