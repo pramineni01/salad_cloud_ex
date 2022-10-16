@@ -8,26 +8,13 @@ type processor struct {
 
 type co2footprint struct {
 	Header [3]byte
-	TailNumberSize uint32
+	TailNumberSize [4]byte // unsigned integer
 	TailNumberValue string
-	EngineCount uint32
-	EngineNameSize uint32
+	EngineCount [4]byte // unsigned integer
+	EngineNameSize [4]byte // unsigned integer
 	EngineNameValue string
-	Latitude float64
-	Longitude float64
-	Altitude float64
-	Temperature float64
+	Latitude [8]byte	// IEEE-754 64-bit floating-point number
+	Longitude [8]byte	// IEEE-754 64-bit floating-point number
+	Altitude [8]byte	// IEEE-754 64-bit floating-point number
+	Temperature [8]byte	// IEEE-754 64-bit floating-point number
 }
-
-// type co2footprint struct {
-// 	Header [3]byte
-// 	TailNumberSize [4]byte // unsigned integer
-// 	TailNumberValue string
-// 	EngineCount [4]byte // unsigned integer
-// 	EngineNameSize [4]byte // unsigned integer
-// 	EngineNameValue string
-// 	Latitude [4]byte	// IEEE-754 64-bit floating-point number
-// 	Longitude [4]byte	// IEEE-754 64-bit floating-point number
-// 	Altitude [4]byte	// IEEE-754 64-bit floating-point number
-// 	Temperature [4]byte	// IEEE-754 64-bit floating-point number
-// }
