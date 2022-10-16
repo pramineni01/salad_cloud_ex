@@ -13,8 +13,8 @@ type co2footprint struct {
 	EngineCount [4]byte // unsigned integer
 	EngineNameSize [4]byte // unsigned integer
 	EngineNameValue string
-	Latitude [4]byte	// IEEE-754 64-bit floating-point number
-	Longitude [4]byte	// IEEE-754 64-bit floating-point number
-	Altitude [4]byte	// IEEE-754 64-bit floating-point number
-	Temperature [4]byte	// IEEE-754 64-bit floating-point number
+	Latitude [8]byte	// IEEE-754 64-bit floating-point number
+	Longitude [8]byte	// IEEE-754 64-bit floating-point number
+	Altitude [8]byte	// IEEE-754 64-bit floating-point number
+	Temperature [8]byte	// IEEE-754 64-bit floating-point number
 }
