@@ -1,19 +1,27 @@
 package processor
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
-	"log"
+	"io"
+	"math"
+	"net"
+	"time"
+
+	log "github.com/golang/glog"
 )
 
 const (
-	float64_len = 4
-	uint32_len = 4
-
+	SizeofUint32 uint32 = 4
+	SizeofFloat64 = 8
+	
 	min_msg_size_const = 31
 	header_size_const = 3
-	header_content = []byte{65, 73, 82}	// 01000001, 01001001, 01010010	
 )
+
+var header_content  = []byte {0x41, 0x49 , 0x52}	// 01000001, 01001001, 01010010	
 
 func (p *processor) Process(ctx context.Context) {
 	// while infinite
@@ -23,17 +31,13 @@ func (p *processor) Process(ctx context.Context) {
 			log.Fatal("TCP connection error: ", err)
 		}
 
-		msg, err := p.listen(ctx, c)
-		c.Close()
+		defer c.Close()
+		p.listenAndProcess(ctx, c)
 	}
 }
 
-func (p *processor) connect(ctx contex.Context) (*TCPConn, error) {
+func (p *processor) connect(ctx context.Context) (*net.TCPConn, error) {
 	// use source and port from p and connect tcp
-	if (ctx.Done()) {
-		return errors.New("User interrupt")
-	}
-	
 	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", p.source, p.port))
 	if err != nil {
 		fmt.Printf("Unable to resolve IP")
@@ -48,7 +52,7 @@ func (p *processor) connect(ctx contex.Context) (*TCPConn, error) {
 
 	err = tcpConn.SetKeepAlive(true)
 	if err != nil {
-		log.Warn("Unable to set keepalive - %s", err)	
+		log.Warningf("Unable to set keepalive - %s", err)
 		tcpConn.Close()
 		return nil, err
 	}
@@ -57,16 +61,11 @@ func (p *processor) connect(ctx contex.Context) (*TCPConn, error) {
 	return tcpConn, nil
 }
 
-func (p *processor) listen(ctx contex.Context, c *TCPConn) ([]byte, err){
+func (p *processor) listenAndProcess(ctx context.Context, c *net.TCPConn) {
 	// listen on the connection indefinitely and return on message
-	status, err := bufio.NewReader(c).ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
-
 	for true {
 		select{
-		case ctx.Done:
+		case <-ctx.Done():
 			break
 		default:
 			buf, err := io.ReadAll(c)
@@ -77,19 +76,11 @@ func (p *processor) listen(ctx contex.Context, c *TCPConn) ([]byte, err){
 				log.Fatal("ReadAll returned empty buffer")
 				time.Sleep(1000)
 				continue
-			}
-			if len(buf) < min_msg_size_const {
-				log.Fatal("Message length is smaller than expected")
 			} else {
 				processMessage(ctx, buf)
 			}
 		}
 	}
-}
-
-func readToBuffer() ([]byte, err) {
-	io.ReadAll()
-	return nil, err
 }
 
 func processMessage(ctx context.Context, msg []byte) {
@@ -99,40 +90,45 @@ func processMessage(ctx context.Context, msg []byte) {
 	fp := co2footprint{}
 
 	// header
-	n, err := io.CopyN(fp.Header, msg, header_size_const)
-	if (err != nil) || (n != header_size_const) {
-		log.Fatal("Error copying header size")
-	}
+	copyBytes(fp.Header, msg[:3], header_size_const)
 	
-	curr_idx := header_size_const
+	curr_idx := uint32(header_size_const)
 
 	// fetch TailNumber info
 	fp.TailNumberSize, fp.TailNumberValue = extractTailNumberInfo(msg[curr_idx:])
-	curr_idx = curr_idx + unsafe.SizeOf(uint32) + fp.TailNumberSize
+	curr_idx = uint32(curr_idx) + SizeofUint32 + fp.TailNumberSize
 
 	// fetch EngineCount, EngineNameSize, EngineNameValue
 	fp.EngineCount, fp.EngineNameSize, fp.EngineNameValue = extractEngineInfo(msg[curr_idx:])
-	curr_idx = curr_idx + unsafe.SizeOf(uint32) + unsafe.SizeOf(uint32) + fp.EngineNameSize
+	curr_idx = curr_idx + SizeofUint32 + SizeofUint32 + fp.EngineNameSize
 
 	// fetch Latitude
 	fp.Latitude =  extractLatitude(msg[curr_idx:])
-	curr_idx = curr_idx + unsafe.SizeOf(float64)
+	curr_idx = curr_idx + SizeofFloat64
 
 	// fetch Longitude
-	fp.Longitude := extractLongitude(msg[curr_idx:])
-	curr_idx = curr_idx + unsafe.SizeOf(float64)
+	fp.Longitude = extractLongitude(msg[curr_idx:])
+	curr_idx = curr_idx + SizeofFloat64
 
 	// fetch Altitude
-	fp.Altitude := extractAltitude(msg[curr_idx:])
-	curr_idx = curr_idx + unsafe.SizeOf(float64)
+	fp.Altitude = extractAltitude(msg[curr_idx:])
+	curr_idx = curr_idx + SizeofFloat64
 
 	// fetch Temperature
-	fp.Temperature := extractTemperature(msg[curr_idx:])
-	curr_idx = curr_idx + unsafe.SizeOf(float64)
+	fp.Temperature = extractTemperature(msg[curr_idx:])
+	curr_idx = curr_idx + SizeofFloat64
 
 	fmt.Printf("Received message:\n%v", fp)
 }
 
+func copyBytes(dst [3]byte, src []byte, size int) {
+	if len(dst) != len(src) {
+		log.Exit("Header size does not match")
+	}
+	for i:= 0; i < size; i++ {
+		dst[i] = src[i]
+	}
+}
 
 // returns tail number and value
 // panics if an issue with message
@@ -144,30 +140,31 @@ func extractTailNumberInfo(msg []byte) (uint32, string) {
 
 // returns engine number and value
 // panics if an issue with message
-func extractEngineInfo(msg []byte) (uint32, string) {
+func extractEngineInfo(msg []byte) (uint32, uint32, string) {
+	engCount := binary.BigEndian.Uint32(extractBytes(msg, 4))
 	engNum := binary.BigEndian.Uint32(extractBytes(msg, 4))
 	engNumVal := extractStringOfSize(msg[4:], engNum)
-	return engNum, engNumVal
+	return engCount, engNum, engNumVal
 }
 
 func extractLatitude(msg []byte) float64 {
-	tmp := extractBytes(msg, 8)
-	return math.Float64frombits(byte)
+	bits := binary.BigEndian.Uint64(extractBytes(msg, 8))
+	return math.Float64frombits(bits)
 }
 
 func extractLongitude(msg []byte) float64 {
-	tmp := extractBytes(msg, 8)
-	return math.Float64frombits(byte)
+	bits := binary.BigEndian.Uint64(extractBytes(msg, 8))
+	return math.Float64frombits(bits)
 }
 
 func extractAltitude(msg []byte) float64 {
-	tmp := extractBytes(msg, 8)
-	return math.Float64frombits(byte)
+	bits := binary.BigEndian.Uint64(extractBytes(msg, 8))
+	return math.Float64frombits(bits)
 }
 
 func extractTemperature(msg []byte) float64 {
-	tmp := extractBytes(msg, 8)
-	return math.Float64frombits(byte)
+	bits := binary.BigEndian.Uint64(extractBytes(msg, 8))
+	return math.Float64frombits(bits)
 }
 
 // extracts bytes, given slice and size required
@@ -180,7 +177,7 @@ func extractBytes(msg []byte, size int) []byte {
 
 // extracts bytes into string, given slice and size required
 func extractStringOfSize(msg []byte, size uint32) string {
-	if len(msg) < size {
+	if uint32(len(msg)) < size {
 		log.Fatal("Message size small to fetch tail number value")
 	}
 

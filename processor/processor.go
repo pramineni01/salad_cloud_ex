@@ -1,19 +1,22 @@
 package processor
 
 import (
+	"context"
 	"errors"
 )
 
 type Processor interface {
-	Process()
+	Process(context.Context)
 }
 
 func NewProcessor(source string, port uint) (Processor, error) {
-	// not implemented
-	return nil, errors.New("Not implemented")
 
-	return process {
-		source: source,
-		port: port
+	if len(source) < 1 {
+		return nil, errors.New("Invalid input")
 	}
+
+	return &processor{
+		source: source,
+		port: port,
+	}, nil
 }

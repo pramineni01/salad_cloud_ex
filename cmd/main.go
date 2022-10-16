@@ -23,7 +23,8 @@ func main() {
 	 }
 
 	 //get context and initiate
-	 ctx := utils.GetContext(nil)
+	 ctx, cancel := utils.GetContext(nil)
+	 defer cancel()
 	 
-	 p.Process()
+	 p.Process(ctx)
 }

@@ -3,7 +3,8 @@ package utils
 import (
 	"context"
 	"os"
-	"signal"
+	"os/signal"
+	"syscall"
 )
 
 func GetContext(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -15,12 +16,12 @@ func GetContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	go func() {
 		defer cancel()
 
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
 
 		select {
-		case sigCh:
-		case ctx.Done():
+		case <-sigs:
+		case <-ctx.Done():
 		}
 	}()
 
