@@ -8,14 +8,13 @@ import (
 	"github.com/pramineni01/salad_cloud_ex/utils"
 )
 
-func main() {
-	// fetch tcp source and port
-	// if invalid input, print error and return
-	// hardcoded for now
-	source := "data.salad.com"
-	port := uint(5000)
+const(
+	source = "data.salad.com"
+	port = uint(5000)
+)
 
-	// create processor and connect
+func main() {
+	// create processor
 	 p, err := processor.NewProcessor(source, port)
 	 if err != nil {
 		log.Fatal("Failed to create processor: ", err)

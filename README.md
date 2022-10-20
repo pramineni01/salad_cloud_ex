@@ -10,6 +10,11 @@ Binary data source: A TCP server is required, which sends the message in certain
 ### Dependency variables
 TCP Source url, and port - Using hardcoded values for this exercise.
 
+### How to build
+1. ```cd``` to sala_cloud_ex/cmd directory
+2. ```CGO_ENABLED=0 GOARCH=amd64 GO111MODULE=off go build -o ../salad_cloud_processor ./...```
+3. One shoud see sala_cloud_ex/salad_cloud_processor binary
+
 ### Yet to be done
 1. Makefile - With targets for building code, building docker, tagging and push to registry (given a container registry)
 2. Dockerfile

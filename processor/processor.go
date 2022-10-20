@@ -11,7 +11,7 @@ type Processor interface {
 
 func NewProcessor(source string, port uint) (Processor, error) {
 
-	if len(source) < 1 {
+	if (len(source) < 1) || (port <= 0) {
 		return nil, errors.New("Invalid input")
 	}
 
